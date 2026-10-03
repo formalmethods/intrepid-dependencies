@@ -46,13 +46,13 @@ You need python 3, CMake 3.25 or newer and Ninja; on Windows, run from a Visual
 Studio developer prompt.
 
 ```
-./build_z3.py
+make            # or: ./build_z3.py
 ```
 
 The package lands in `dist/`, with a `.sha256` file next to it. The download
 and the build tree are kept in `work/`, so running it again only rebuilds what
 changed. The compiler is the one CMake picks, or the one named by `CC` and
-`CXX`.
+`CXX`. `make clean` removes both directories.
 
 ## Releasing
 
@@ -64,13 +64,22 @@ A release is tagged `z3-<Z3_VERSION>-<Z3_REVISION>`, e.g. `z3-5.0.0-1`.
 - **Same z3, built differently** (flags, compiler, platforms): bump
   `Z3_REVISION`.
 
-Commit, then push the tag. The workflow in `.github/workflows/z3.yml` builds on
-every platform, checks that the tag matches `versions.env`, and publishes the
-packages and a `SHA256SUMS` file as a release.
+Commit and push to `main`, then run:
+
+```
+make release
+```
+
+It tags the current commit as `z3-<Z3_VERSION>-<Z3_REVISION>` and pushes the
+tag. It refuses if the working tree has uncommitted changes, if the current
+branch is not `main`, if the commit is not on `origin/main` yet, or if the tag
+already exists. The tag starts the workflow in `.github/workflows/z3.yml`, which
+builds on every platform, checks that the tag matches `versions.env`, and
+publishes the packages and a `SHA256SUMS` file as a release.
 
 Then, in intrepid, set `INTREPID_Z3_PACKAGE` to the new `<version>-<rev>` and
-the `INTREPID_Z3_SHA256_*` checksums to the ones in `SHA256SUMS`; they are in
-intrepid's `CMakeLists.txt`.
+the `INTREPID_Z3_SHA256_*` checksums to the ones in `SHA256SUMS`; they are all
+in intrepid's `cmake/Z3.cmake`.
 
 ## License
 

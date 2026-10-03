@@ -1,0 +1,96 @@
+# Builds z3 with build_z3.py on every supported platform. On a tag
+# z3-<Z3_VERSION>-<Z3_REVISION> it also publishes the packages, and a
+# SHA256SUMS file, as a GitHub release, which is where intrepid downloads
+# them from.
+#
+# The platforms match intrepid's: Linux x86_64 in the manylinux_2_28
+# container, so that the library only needs glibc 2.28, and Windows x86_64
+# with MSVC.
+
+name: z3
+
+on:
+  push:
+    branches: [main]
+    tags: ['z3-*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    container: quay.io/pypa/manylinux_2_28_x86_64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          /opt/python/cp312-cp312/bin/pip install cmake ninja
+          echo /opt/python/cp312-cp312/bin >> "$GITHUB_PATH"
+
+      - name: Build
+        env:
+          CC: gcc
+          CXX: g++
+        run: /opt/python/cp312-cp312/bin/python build_z3.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: z3-linux
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build
+        run: python build_z3.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: z3-windows
+          path: |
+            dist/*.zip
+            dist/*.sha256
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/z3-')
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that the tag matches versions.env
+        run: |
+          . ./versions.env
+          test "$GITHUB_REF_NAME" = "z3-$Z3_VERSION-$Z3_REVISION"
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist
+          cat *.sha256 > SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" *.tar.gz *.zip SHA256SUMS \
+            --title "$GITHUB_REF_NAME" --notes-file - <<NOTES
+          z3 built by build_z3.py for intrepid. Each package has a BUILDINFO.txt
+          with the compiler and options used.
+
+          \`\`\`
+          $(cat SHA256SUMS)
+          \`\`\`
+          NOTES

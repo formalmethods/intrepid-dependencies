@@ -17,6 +17,14 @@ on:
   pull_request:
   workflow_dispatch:
 
+# A newer run on the same branch or pull request, of the same kind, cancels the
+# one still going: its result would be stale. A run by hand is a group of its
+# own, so a push does not cancel it; a run on a tag is a release, never
+# cancelled (a tag pushed again waits for the run before it).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
 jobs:
   linux:
     runs-on: ubuntu-latest

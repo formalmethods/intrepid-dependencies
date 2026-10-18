@@ -76,7 +76,9 @@ tag. It refuses if the working tree has uncommitted changes, if the current
 branch is not `main`, if the commit is not on `origin/main` yet, or if the tag
 already exists. The tag starts the workflow in `.github/workflows/z3.yml`, which
 builds on every platform, checks that the tag matches `versions.env`, and
-publishes the packages and a `SHA256SUMS` file as a release.
+publishes the packages and a `SHA256SUMS` file as a release. A newer run of
+the workflow on the same branch or pull request cancels the one still going;
+a run on a tag, a release, is never cancelled, nor one started by hand.
 
 Then, in intrepid, set `INTREPID_Z3_PACKAGE` to the new `<version>-<rev>` and
 the `INTREPID_Z3_SHA256_*` checksums to the ones in `SHA256SUMS`; they are all

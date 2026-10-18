@@ -4,8 +4,9 @@
 # them from.
 #
 # The platforms match intrepid's: Linux x86_64 in the manylinux_2_28
-# container, so that the library only needs glibc 2.28, and Windows x86_64
-# with MSVC.
+# container, so that the library only needs glibc 2.28, Windows x86_64 with
+# MSVC, and macOS universal (arm64 and x86_64, for macOS 11 and later) with
+# Apple's clang, on an Apple silicon runner.
 
 name: z3
 
@@ -60,9 +61,32 @@ jobs:
             dist/*.zip
             dist/*.sha256
 
+  # macOS runners cost several times Linux's: on a release, or by hand
+  macos:
+    if: startsWith(github.ref, 'refs/tags/z3-') || github.event_name == 'workflow_dispatch'
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build tools
+        run: python -m pip install cmake ninja
+
+      - name: Build
+        run: python build_z3.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: z3-macos
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+
   release:
     if: startsWith(github.ref, 'refs/tags/z3-')
-    needs: [linux, windows]
+    needs: [linux, windows, macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write

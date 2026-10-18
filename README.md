@@ -25,6 +25,7 @@ against the pinned SHA256, and builds z3 as:
 | ---------------- | ------------------------------------------ | ---------------------------------------- |
 | Linux x86_64     | `manylinux_2_28` container, gcc: glibc 2.28 or newer | `z3-<version>-<rev>-linux-x86_64.tar.gz` |
 | Windows x86_64   | `windows-latest`, MSVC                     | `z3-<version>-<rev>-windows-x86_64.zip`  |
+| macOS universal (arm64 and x86_64) | `macos-14` (Apple silicon), Apple clang: macOS 11 or newer | `z3-<version>-<rev>-macos-universal2.tar.gz` |
 
 Each package contains:
 

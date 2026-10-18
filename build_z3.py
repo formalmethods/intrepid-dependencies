@@ -9,7 +9,10 @@ The library is built as:
   links into its own libraries, so that they need nothing else at run time;
 - position independent, since it ends up inside libintrepid.so;
 - with hidden symbol visibility, except for z3's own C API;
-- in release mode, without the z3 executable, examples, tests or bindings.
+- in release mode, without the z3 executable, examples, tests or bindings;
+- on macOS, universal (arm64 and x86_64 in one library, the platform
+  macos-universal2), for macOS 11 and later (MACOS_DEPLOYMENT_TARGET), the
+  first with Apple silicon.
 
 The result is dist/z3-<version>-<revision>-<platform>.tar.gz (.zip on
 Windows), with a .sha256 file next to it. It contains
@@ -72,6 +75,18 @@ Z3_CMAKE_OPTIONS = [
 ]
 
 
+# On macOS: one library for both architectures, from the oldest macOS that
+# runs on Apple silicon; intrepid and intrepyd's wheels follow it
+MACOS_ARCHITECTURES = 'arm64;x86_64'
+MACOS_DEPLOYMENT_TARGET = '11.0'
+MACOS_CMAKE_OPTIONS = [
+    '-DCMAKE_OSX_ARCHITECTURES=' + MACOS_ARCHITECTURES,
+    '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + MACOS_DEPLOYMENT_TARGET,
+]
+
+SUPPORTED_PLATFORMS = ('linux-x86_64', 'windows-x86_64', 'macos-universal2')
+
+
 def read_versions():
     versions = {}
     with open(os.path.join(HERE, 'versions.env')) as versions_file:
@@ -85,9 +100,16 @@ def read_versions():
 
 def current_platform():
     system = platform.system().lower()
+    if system == 'darwin':
+        return 'macos-universal2'   # both architectures, whichever Mac builds it
     machine = platform.machine().lower()
     machine = {'amd64': 'x86_64', 'aarch64': 'arm64'}.get(machine, machine)
     return '%s-%s' % (system, machine)
+
+
+def cmake_options(plat):
+    """z3's CMake options for a platform."""
+    return Z3_CMAKE_OPTIONS + (MACOS_CMAKE_OPTIONS if plat.startswith('macos') else [])
 
 
 def run(command, **kwargs):
@@ -145,6 +167,14 @@ def compiler_description(build_dir):
     return '%s (%s)' % (result.stdout.splitlines()[0], compiler)
 
 
+def check_universal(library):
+    """That a macOS library has both architectures (lipo -archs)."""
+    archs = subprocess.run(['lipo', '-archs', library], capture_output=True, text=True,
+                           check=True).stdout.split()
+    if sorted(archs) != sorted(MACOS_ARCHITECTURES.split(';')):
+        sys.exit('Error: %s has the architectures %s, not %s' % (library, archs, MACOS_ARCHITECTURES))
+
+
 def package(stage_dir, name, plat):
     os.makedirs(DIST_DIR, exist_ok=True)
     if plat.startswith('windows'):
@@ -171,7 +201,7 @@ def main():
     versions = read_versions()
     version, revision = versions['Z3_VERSION'], versions['Z3_REVISION']
     plat = current_platform()
-    if plat not in ('linux-x86_64', 'windows-x86_64'):
+    if plat not in SUPPORTED_PLATFORMS:
         sys.exit('Error: unsupported platform %s' % plat)
     name = 'z3-%s-%s-%s' % (version, revision, plat)
 
@@ -180,7 +210,8 @@ def main():
     stage_dir = os.path.join(DIST_DIR, name)
     shutil.rmtree(stage_dir, ignore_errors=True)
 
-    run(['cmake', '-S', source_dir, '-B', build_dir, '-G', 'Ninja'] + Z3_CMAKE_OPTIONS)
+    options = cmake_options(plat)
+    run(['cmake', '-S', source_dir, '-B', build_dir, '-G', 'Ninja'] + options)
     build = ['cmake', '--build', build_dir]
     if args.jobs:
         build += ['--parallel', str(args.jobs)]
@@ -200,9 +231,11 @@ def main():
         info.write('built: %s\n' % datetime.datetime.now(datetime.timezone.utc)
                    .strftime('%Y-%m-%d %H:%M UTC'))
         info.write('cmake options:\n')
-        for option in Z3_CMAKE_OPTIONS:
+        for option in options:
             info.write('    %s\n' % option)
 
+    if plat.startswith('macos'):
+        check_universal(os.path.join(stage_dir, 'lib', 'libz3.a'))
     archive = package(stage_dir, name, plat)
     print('# Created %s' % os.path.relpath(archive, HERE))
 

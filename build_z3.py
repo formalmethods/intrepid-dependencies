@@ -11,8 +11,9 @@ The library is built as:
 - with hidden symbol visibility, except for z3's own C API;
 - in release mode, without the z3 executable, examples, tests or bindings;
 - on macOS, universal (arm64 and x86_64 in one library, the platform
-  macos-universal2), for macOS 11 and later (MACOS_DEPLOYMENT_TARGET), the
-  first with Apple silicon.
+  macos-universal2), for macOS 13.3 and later (MACOS_DEPLOYMENT_TARGET), the
+  first whose libc++ has std::to_chars for floating point, which z3 uses
+  through std::format.
 
 The result is dist/z3-<version>-<revision>-<platform>.tar.gz (.zip on
 Windows), with a .sha256 file next to it. It contains
@@ -75,10 +76,12 @@ Z3_CMAKE_OPTIONS = [
 ]
 
 
-# On macOS: one library for both architectures, from the oldest macOS that
-# runs on Apple silicon; intrepid and intrepyd's wheels follow it
+# On macOS: one library for both architectures, from the oldest macOS whose
+# libc++ has std::to_chars for floating point (z3 uses it through std::format:
+# with an older target, Apple's headers make it unavailable); intrepid and
+# intrepyd's wheels follow it
 MACOS_ARCHITECTURES = 'arm64;x86_64'
-MACOS_DEPLOYMENT_TARGET = '11.0'
+MACOS_DEPLOYMENT_TARGET = '13.3'
 MACOS_CMAKE_OPTIONS = [
     '-DCMAKE_OSX_ARCHITECTURES=' + MACOS_ARCHITECTURES,
     '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + MACOS_DEPLOYMENT_TARGET,

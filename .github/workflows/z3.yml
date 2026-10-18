@@ -5,7 +5,7 @@
 #
 # The platforms match intrepid's: Linux x86_64 in the manylinux_2_28
 # container, so that the library only needs glibc 2.28, Windows x86_64 with
-# MSVC, and macOS universal (arm64 and x86_64, for macOS 11 and later) with
+# MSVC, and macOS universal (arm64 and x86_64, for macOS 13.3 and later) with
 # Apple's clang, on an Apple silicon runner.
 
 name: z3
@@ -61,10 +61,12 @@ jobs:
             dist/*.zip
             dist/*.sha256
 
-  # macOS runners cost several times Linux's: on a release, or by hand
+  # macOS runners cost several times Linux's: on a release, or by hand.
+  # macos-15, whose Xcode 16 has clang 16 or later: z3 initializes aggregates
+  # with parentheses (C++20), which the clang 15 of macos-14 rejects.
   macos:
     if: startsWith(github.ref, 'refs/tags/z3-') || github.event_name == 'workflow_dispatch'
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

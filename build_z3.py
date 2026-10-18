@@ -10,8 +10,8 @@ The library is built as:
 - position independent, since it ends up inside libintrepid.so;
 - with hidden symbol visibility, except for z3's own C API;
 - in release mode, without the z3 executable, examples, tests or bindings;
-- on macOS, universal (arm64 and x86_64 in one library, the platform
-  macos-universal2), for macOS 13.3 and later (MACOS_DEPLOYMENT_TARGET), the
+- on macOS, for Apple silicon only (arm64, the platform macos-arm64), for
+  macOS 13.3 and later (MACOS_DEPLOYMENT_TARGET), the
   first whose libc++ has std::to_chars for floating point, which z3 uses
   through std::format.
 
@@ -76,18 +76,20 @@ Z3_CMAKE_OPTIONS = [
 ]
 
 
-# On macOS: one library for both architectures, from the oldest macOS whose
+# On macOS: Apple silicon only (z3's CMakeLists.txt sets CMAKE_OSX_ARCHITECTURES
+# to the architecture it runs on, so a universal library would need a patch),
+# from the oldest macOS whose
 # libc++ has std::to_chars for floating point (z3 uses it through std::format:
 # with an older target, Apple's headers make it unavailable); intrepid and
 # intrepyd's wheels follow it
-MACOS_ARCHITECTURES = 'arm64;x86_64'
+MACOS_ARCHITECTURE = 'arm64'
 MACOS_DEPLOYMENT_TARGET = '13.3'
 MACOS_CMAKE_OPTIONS = [
-    '-DCMAKE_OSX_ARCHITECTURES=' + MACOS_ARCHITECTURES,
+    '-DCMAKE_OSX_ARCHITECTURES=' + MACOS_ARCHITECTURE,
     '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + MACOS_DEPLOYMENT_TARGET,
 ]
 
-SUPPORTED_PLATFORMS = ('linux-x86_64', 'windows-x86_64', 'macos-universal2')
+SUPPORTED_PLATFORMS = ('linux-x86_64', 'windows-x86_64', 'macos-arm64')
 
 
 def read_versions():
@@ -104,7 +106,7 @@ def read_versions():
 def current_platform():
     system = platform.system().lower()
     if system == 'darwin':
-        return 'macos-universal2'   # both architectures, whichever Mac builds it
+        system = 'macos'
     machine = platform.machine().lower()
     machine = {'amd64': 'x86_64', 'aarch64': 'arm64'}.get(machine, machine)
     return '%s-%s' % (system, machine)
@@ -170,12 +172,12 @@ def compiler_description(build_dir):
     return '%s (%s)' % (result.stdout.splitlines()[0], compiler)
 
 
-def check_universal(library):
-    """That a macOS library has both architectures (lipo -archs)."""
+def check_architecture(library):
+    """That a macOS library is for Apple silicon, and only for it (lipo -archs)."""
     archs = subprocess.run(['lipo', '-archs', library], capture_output=True, text=True,
                            check=True).stdout.split()
-    if sorted(archs) != sorted(MACOS_ARCHITECTURES.split(';')):
-        sys.exit('Error: %s has the architectures %s, not %s' % (library, archs, MACOS_ARCHITECTURES))
+    if archs != [MACOS_ARCHITECTURE]:
+        sys.exit('Error: %s has the architectures %s, not %s' % (library, archs, MACOS_ARCHITECTURE))
 
 
 def package(stage_dir, name, plat):
@@ -238,7 +240,7 @@ def main():
             info.write('    %s\n' % option)
 
     if plat.startswith('macos'):
-        check_universal(os.path.join(stage_dir, 'lib', 'libz3.a'))
+        check_architecture(os.path.join(stage_dir, 'lib', 'libz3.a'))
     archive = package(stage_dir, name, plat)
     print('# Created %s' % os.path.relpath(archive, HERE))
 
